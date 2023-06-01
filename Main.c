@@ -127,9 +127,14 @@
                  // Parse HTTP request
                 char method[BUF_SIZE], path[BUF_SIZE], protocol[BUF_SIZE];
                 sscanf(buffer, "%s %s %s", method, path, protocol);
+                //imprime path
+                printf("%s\n", path);
+                //imprime buffer
+                printf("%s\n", buffer);
+
                  // Handle GET requests
                 if (strcmp(method, "GET") == 0) {
-                    //Continuación del código corregido:
+                    if (strcmp(path, "/") == 0) {
                      // Send HTTP response header
                     char response[BUF_SIZE];
                     snprintf(response, BUF_SIZE, "HTTP/1.1 200 OK\r\n"
@@ -159,10 +164,33 @@
                     } else {
                         error("ERROR opening directory");
                     }
+                    
                      // Send HTML footer
                      snprintf(response, BUF_SIZE, "</ul></body></html>");
                     if (send(fds[i].fd, response, strlen(response), 0) < 0) {error("ERROR sending HTML footer");
                     }
+                } else if (strcmp(path, "/favicon.ico") == 0) {
+                    // Ignore request for favicon.ico
+                    close(fds[i].fd);
+                    nfds--;
+                    fds[i].fd = -1;
+                    continue;
+                }
+                
+                else {
+                // Si se solicita un archivo, envíe el archivo
+                char filepath[BUF_SIZE];
+                snprintf(filepath, BUF_SIZE, "%s%s", dirpath, path);
+                //imprimir el filepath
+                printf("%s\n",filepath);
+                //imprimir path
+                printf("%s\n",path);
+                //imprimir dirpath
+                printf("%s\n",dirpath);
+                if (send_file(fds[i].fd, filepath) < 0) {
+                    error("ERROR sending file");
+                   }
+                }
                 }
                 // Close socket and remove from pollfd array
                 close(fds[i].fd);
