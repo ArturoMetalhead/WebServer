@@ -10,8 +10,29 @@
 #include <errno.h>
 #include <time.h>
 #include <poll.h>
- #define BUF_SIZE 1024
+#include <ctype.h>
+#define BUF_SIZE 1024
 #define MAX_EVENTS 10
+
+/* Decode a URL-encoded string in place */
+void url_decode(char *str)
+{
+    char *src = str, *dst = str;
+    while (*src) {
+        if (*src == '%' && isxdigit(src[1]) && isxdigit(src[2])) {
+            if (src[1] == '2' && src[2] == '0') {
+                *dst++ = ' ';
+            } else {
+                *dst++ = (char) strtol(src + 1, NULL, 16);
+            }
+            src += 3;
+        } else {
+            *dst++ = *src++;
+        }
+    }
+    *dst = '\0';
+}
+
  void error(char *msg) {
     perror(msg);
     exit(1);
@@ -129,6 +150,9 @@
                 sscanf(buffer, "%s %s %s", method, path, protocol);
                 //imprime path
                 printf("%s\n", path);
+                url_decode(path);  // Decode URL-encoded filename
+                //imprime path decodificado
+                printf("%s\n", path);
                 //imprime buffer
                 printf("%s\n", buffer);
 
@@ -145,25 +169,37 @@
                         error("ERROR sending HTTP response header");
                     }
                      // Send directory listing
-                    DIR *dir;
-                    struct dirent *entry;
-                    if ((dir = opendir(dirpath)) != NULL) {
-                        
-                        while ((entry = readdir(dir)) != NULL) {
-                            char *filename = entry->d_name;
-                            if (strcmp(filename, ".") != 0 && strcmp(filename, "..") != 0) {
-                                char filepath[BUF_SIZE];
-                                snprintf(filepath, BUF_SIZE, "%s/%s", dirpath, filename);
-                                snprintf(response, BUF_SIZE, "<li><a href=\"%s\">%s</a></li>", filename, filename);
-                                if (send(fds[i].fd, response, strlen(response), 0) < 0) {
-                                    error("ERROR sending directory listing");
-                                }
-                            }
-                        }
-                        closedir(dir);
-                    } else {
-                        error("ERROR opening directory");
-                    }
+
+DIR *dir;
+struct dirent *entry;
+struct stat filestat;
+if ((dir = opendir(dirpath)) != NULL) {
+    while ((entry = readdir(dir)) != NULL) {
+        char *filename = entry->d_name;
+        //imprime filename
+        printf("VER ESTO %s\n", filename);
+        url_decode(filename);  // Decode URL-encoded filename
+        //imprime filename
+        printf("VER ESTO CONVERTIDO %s\n", filename);
+        if (strcmp(filename, ".") != 0 && strcmp(filename, "..") != 0) {
+            char filepath[BUF_SIZE];
+            snprintf(filepath, BUF_SIZE, "%s/%s", dirpath, filename);
+            
+            if (stat(filepath, &filestat) == 0 && S_ISDIR(filestat.st_mode)) {
+                snprintf(response, BUF_SIZE, "<li><a href=\"%s/\">%s/</a></li>", filename, filename);
+            } else {
+                snprintf(response, BUF_SIZE, "<li><a href=\"%s\">%s</a></li>", filename, filename);
+            }
+            if (send(fds[i].fd, response, strlen(response), 0) < 0) {
+                error("ERROR sending directory listing");
+            }
+        }
+    }
+    closedir(dir);
+} else {
+    error("ERROR opening directory");
+}
+               
                     
                      // Send HTML footer
                      snprintf(response, BUF_SIZE, "</ul></body></html>");
@@ -205,3 +241,5 @@
     close(sockfd);
     return 0;
 }
+
+//cambio radical otra
