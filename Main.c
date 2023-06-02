@@ -11,6 +11,7 @@
 #include <time.h>
 #include <poll.h>
 #include <ctype.h>
+
 #define BUF_SIZE 1024
 #define MAX_EVENTS 10
 
@@ -155,10 +156,7 @@ void url_decode(char *str)
                 url_decode(path);  // Decode URL-encoded filename
 
                  // Handle GET requests
-                if (strcmp(method, "GET") == 0) {
-                    //imprime path
-                    printf("path: %s\n", path);
-
+                if (strcmp(method, "GET") == 0) {                   
                     if (strcmp(path, "/") == 0 || path[strlen(path) - 1] == '/') {
                      // Send HTTP response header
                      char response[BUF_SIZE];
@@ -171,13 +169,7 @@ void url_decode(char *str)
                      }
 
                      // Send directory listing
-                     if(path[strlen(path) - 1] == '/'){
-                        
-                        //imprime temp
-                        printf("temp: %s\n", temp);
-
-                           
-                        //concatena los strings dirpath con path detras de dirpath
+                     if(path[strlen(path) - 1] == '/'){//if its a folder                       
                         dirpath = strcat(dirpath, path);                        
                      }
 
@@ -204,13 +196,7 @@ void url_decode(char *str)
                             }
                         }
                         closedir(dir);
-                        //imprime dirpath
-                        printf("dirpath: %s\n", dirpath);
-                        //imprime temp
-                        printf("temp: %s\n", temp);
                         strcpy(dirpath,temp);
-                        //imprime dirpath
-                        printf("dirpath2: %s\n", dirpath);
                         } 
                         else {
                          error("ERROR opening directory");
@@ -229,31 +215,10 @@ void url_decode(char *str)
                       continue;
                     }
                 
-                    else {
-                    //  char* lastDirectory;
-                    //  lastDirectory = strrchr(path, '/');
-                    //  if(lastDirectory != NULL) {
-                    //  lastDirectory++;
-                    //  } else {
-                    //    lastDirectory = path;
-                    //  }
-                    //  //imprime lastDirectory
-                    //     printf("lastDirectory: %s\n", lastDirectory);
-
-                      
-                        
-
-
+                    else {                
                      // If a file is requested, send the file
                      char filepath[BUF_SIZE];
                      snprintf(filepath, BUF_SIZE, "%s%s", dirpath, path); 
-                     //imprime filepath
-                        printf("filepath: %s\n", filepath);
-                        //imprime dirpath
-                        printf("dirpath: %s\n", dirpath);
-                        //imprime path
-                        printf("path: %s\n", path);
-
 
                      if (send_file(fds[i].fd, filepath) < 0) {
                          error("ERROR sending file");
@@ -273,5 +238,3 @@ void url_decode(char *str)
     close(sockfd);
     return 0;
 }
-
-//cambio radical otra
