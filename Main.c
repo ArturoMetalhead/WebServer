@@ -14,7 +14,7 @@
 #define BUF_SIZE 1024
 #define MAX_EVENTS 10
 
-/* Decode a URL-encoded string in place */
+// Decode a URL-encoded string (modifies the original string)
 void url_decode(char *str)
 {
     char *src = str, *dst = str;
@@ -32,11 +32,12 @@ void url_decode(char *str)
     }
     *dst = '\0';
 }
-
+// Print an error message and exit
  void error(char *msg) {
     perror(msg);
     exit(1);
 }
+// Send file contents to socket
  int send_file(int sockfd, char *filepath) {
     // Open the file
     int fd = open(filepath, O_RDONLY);
@@ -73,18 +74,16 @@ void url_decode(char *str)
     close(fd);
      return 0;
 }
+
+
  int main(int argc, char *argv[]) {
     int sockfd, newsockfd, portno;
     socklen_t clilen;
     char buffer[BUF_SIZE];
     struct sockaddr_in serv_addr, cli_addr;
-    int n, i, j;
-    //  // Check command-line arguments
-    // if (argc != 2) {
-    //     fprintf(stderr, "Usage: %s <directory>\n", argv[0]);
-    //     exit(1);
-    // }
-     // Create socket
+    
+
+    // Create socket
     sockfd = socket(AF_INET, SOCK_STREAM, 0);
     if (sockfd < 0) {
         error("ERROR opening socket");
@@ -93,31 +92,36 @@ void url_decode(char *str)
     memset(&serv_addr, 0, sizeof(serv_addr));
     portno =atoi(argv[1]);
     char *dirpath = argv[2];
+    char *temp=(char*) malloc(strlen(dirpath) + 1);
+    strcpy(temp,dirpath);
+    strcpy(temp,dirpath);
     serv_addr.sin_family = AF_INET;
     serv_addr.sin_addr.s_addr = INADDR_ANY;
     serv_addr.sin_port = htons(portno);
     if (bind(sockfd, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0) {
         error("ERROR on binding");
     }
-     // Listen for connections
+
+    // Listen for connections
     listen(sockfd, 5);
     printf("Listening on port %d...\n", portno);
     printf("Serving directory: %s\n", dirpath);
     printf("http://localhost:%d\n", portno);
 
-     // Set up pollfd array
+    // Set up pollfd array
     struct pollfd fds[MAX_EVENTS];
     nfds_t nfds = 1;
     fds[0].fd = sockfd;
     fds[0].events = POLLIN;
-     // Main loop
+
+    // Main loop
     while (1) {
         // Wait for events on sockets
         int nready = poll(fds, nfds, -1);
         if (nready < 0) {
             error("ERROR on poll");
         }
-         // Check for new connection
+        // Check for new connection
         if (fds[0].revents & POLLIN) {
             clilen = sizeof(cli_addr);
             newsockfd = accept(sockfd, (struct sockaddr *)&cli_addr, &clilen);
@@ -129,12 +133,12 @@ void url_decode(char *str)
             fds[nfds].events = POLLIN;
             nfds++;
         }
-         // Check for events on existing sockets
-        for (i = 1; i < nfds; i++) {
+        // Check for events on existing sockets
+        for (int i = 1; i < nfds; i++) {
             if (fds[i].revents & POLLIN) {
                 // Read HTTP request
                 memset(buffer, 0, BUF_SIZE);
-                n = recv(fds[i].fd, buffer, BUF_SIZE - 1, 0);
+                int n = recv(fds[i].fd, buffer, BUF_SIZE - 1, 0);
                 if (n < 0) {
                     error("ERROR reading from socket");
                 }
@@ -147,91 +151,119 @@ void url_decode(char *str)
                 }
                  // Parse HTTP request
                 char method[BUF_SIZE], path[BUF_SIZE], protocol[BUF_SIZE];
-                sscanf(buffer, "%s %s %s", method, path, protocol);
-                //imprime path
-                printf("%s\n", path);
+                sscanf(buffer, "%s %s %s", method, path, protocol);              
                 url_decode(path);  // Decode URL-encoded filename
-                //imprime path decodificado
-                printf("%s\n", path);
-                //imprime buffer
-                printf("%s\n", buffer);
 
                  // Handle GET requests
                 if (strcmp(method, "GET") == 0) {
-                    if (strcmp(path, "/") == 0) {
+                    //imprime path
+                    printf("path: %s\n", path);
+
+                    if (strcmp(path, "/") == 0 || path[strlen(path) - 1] == '/') {
                      // Send HTTP response header
-                    char response[BUF_SIZE];
-                    snprintf(response, BUF_SIZE, "HTTP/1.1 200 OK\r\n"
+                     char response[BUF_SIZE];
+                     snprintf(response, BUF_SIZE, "HTTP/1.1 200 OK\r\n"
                              "Content-Type: text/html\r\n"
                              "Connection: close\r\n\r\n"
                              "<html><body><ul>");
-                    if (send(fds[i].fd, response, strlen(response), 0) < 0) {
+                     if (send(fds[i].fd, response, strlen(response), 0) < 0) {
                         error("ERROR sending HTTP response header");
-                    }
-                     // Send directory listing
+                     }
 
-DIR *dir;
-struct dirent *entry;
-struct stat filestat;
-if ((dir = opendir(dirpath)) != NULL) {
-    while ((entry = readdir(dir)) != NULL) {
-        char *filename = entry->d_name;
-        //imprime filename
-        printf("VER ESTO %s\n", filename);
-        url_decode(filename);  // Decode URL-encoded filename
-        //imprime filename
-        printf("VER ESTO CONVERTIDO %s\n", filename);
-        if (strcmp(filename, ".") != 0 && strcmp(filename, "..") != 0) {
-            char filepath[BUF_SIZE];
-            snprintf(filepath, BUF_SIZE, "%s/%s", dirpath, filename);
+                     // Send directory listing
+                     if(path[strlen(path) - 1] == '/'){
+                        
+                        //imprime temp
+                        printf("temp: %s\n", temp);
+
+                           
+                        //concatena los strings dirpath con path detras de dirpath
+                        dirpath = strcat(dirpath, path);                        
+                     }
+
+                     DIR *dir;
+                     struct dirent *entry;
+                     struct stat filestat;
+                     if ((dir = opendir(dirpath)) != NULL) {
+                         while ((entry = readdir(dir)) != NULL) {
+                           char *filename = entry->d_name;
+                         url_decode(filename);  // Decode URL-encoded filename
+                         
+                          if (strcmp(filename, ".") != 0 && strcmp(filename, "..") != 0) {
+                             char filepath[BUF_SIZE];
+                             snprintf(filepath, BUF_SIZE, "%s/%s", dirpath, filename);
             
-            if (stat(filepath, &filestat) == 0 && S_ISDIR(filestat.st_mode)) {
-                snprintf(response, BUF_SIZE, "<li><a href=\"%s/\">%s/</a></li>", filename, filename);
-            } else {
-                snprintf(response, BUF_SIZE, "<li><a href=\"%s\">%s</a></li>", filename, filename);
-            }
-            if (send(fds[i].fd, response, strlen(response), 0) < 0) {
-                error("ERROR sending directory listing");
-            }
-        }
-    }
-    closedir(dir);
-} else {
-    error("ERROR opening directory");
-}
+                             if (stat(filepath, &filestat) == 0 && S_ISDIR(filestat.st_mode)) {
+                                 snprintf(response, BUF_SIZE, "<li><a href=\"%s/\">%s/</a></li>", filename, filename);
+                                } else {
+                                 snprintf(response, BUF_SIZE, "<li><a href=\"%s\">%s</a></li>", filename, filename);
+                                }
+                             if (send(fds[i].fd, response, strlen(response), 0) < 0) {
+                                 error("ERROR sending directory listing");
+                                }
+                            }
+                        }
+                        closedir(dir);
+                        //imprime dirpath
+                        printf("dirpath: %s\n", dirpath);
+                        //imprime temp
+                        printf("temp: %s\n", temp);
+                        strcpy(dirpath,temp);
+                        //imprime dirpath
+                        printf("dirpath2: %s\n", dirpath);
+                        } 
+                        else {
+                         error("ERROR opening directory");
+                         }
                
                     
                      // Send HTML footer
                      snprintf(response, BUF_SIZE, "</ul></body></html>");
-                    if (send(fds[i].fd, response, strlen(response), 0) < 0) {error("ERROR sending HTML footer");
+                     if (send(fds[i].fd, response, strlen(response), 0) < 0) {error("ERROR sending HTML footer");}    
+                    } 
+                    else if (strcmp(path, "/favicon.ico") == 0) {
+                      // Ignore request for favicon.ico
+                      close(fds[i].fd);
+                      nfds--;
+                      fds[i].fd = -1;
+                      continue;
                     }
-                } else if (strcmp(path, "/favicon.ico") == 0) {
-                    // Ignore request for favicon.ico
-                    close(fds[i].fd);
-                    nfds--;
-                    fds[i].fd = -1;
-                    continue;
-                }
                 
-                else {
-                // Si se solicita un archivo, envíe el archivo
-                char filepath[BUF_SIZE];
-                snprintf(filepath, BUF_SIZE, "%s%s", dirpath, path);
-                //imprimir el filepath
-                printf("%s\n",filepath);
-                //imprimir path
-                printf("%s\n",path);
-                //imprimir dirpath
-                printf("%s\n",dirpath);
-                if (send_file(fds[i].fd, filepath) < 0) {
-                    error("ERROR sending file");
-                   }
-                }
+                    else {
+                    //  char* lastDirectory;
+                    //  lastDirectory = strrchr(path, '/');
+                    //  if(lastDirectory != NULL) {
+                    //  lastDirectory++;
+                    //  } else {
+                    //    lastDirectory = path;
+                    //  }
+                    //  //imprime lastDirectory
+                    //     printf("lastDirectory: %s\n", lastDirectory);
+
+                      
+                        
+
+
+                     // If a file is requested, send the file
+                     char filepath[BUF_SIZE];
+                     snprintf(filepath, BUF_SIZE, "%s%s", dirpath, path); 
+                     //imprime filepath
+                        printf("filepath: %s\n", filepath);
+                        //imprime dirpath
+                        printf("dirpath: %s\n", dirpath);
+                        //imprime path
+                        printf("path: %s\n", path);
+
+
+                     if (send_file(fds[i].fd, filepath) < 0) {
+                         error("ERROR sending file");
+                        }
+                    }
                 }
                 // Close socket and remove from pollfd array
                 close(fds[i].fd);
                 nfds--;
-                for (j = i; j < nfds; j++) {
+                for (int j = i; j < nfds; j++) {
                     fds[j] = fds[j + 1];
                 }
                 i--; // Decrement i so that next iteration will process the same index
