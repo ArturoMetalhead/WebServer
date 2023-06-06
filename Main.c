@@ -57,8 +57,8 @@ void url_decode(char *str)
     snprintf(response, BUF_SIZE, "HTTP/1.1 200 OK\r\n"
              "Content-Type: application/octet-stream\r\n"
              "Content-Length: %ld\r\n"
-             "Content-Disposition: attachment; filename=\"%s\"\r\n"
-             "Connection: close\r\n\r\n", filesize, filepath);
+             "Content-Disposition: attachment; filename=\r\n"
+             "Connection: close\r\n\r\n", filesize);
     if (send(sockfd, response, strlen(response), 0) < 0) {
         close(fd);
         return -1;
@@ -75,7 +75,61 @@ void url_decode(char *str)
     close(fd);
      return 0;
 }
+// Send directory contents to socket
+int send_directory(char *path,struct pollfd fds,char *dirpath,char *temp){
+     // Send HTTP response header
+                     char response[BUF_SIZE];
+                     snprintf(response, BUF_SIZE, "HTTP/1.1 200 OK\r\n"
+                             "Content-Type: text/html\r\n"
+                             "Connection: close\r\n\r\n"
+                             "<html><body><ul>");
+                     if (send(fds.fd, response, strlen(response), 0) < 0) {
+                        error("ERROR sending HTTP response header");
+                        return -1;
+                     }
 
+                     // Send directory listing
+                     if(path[strlen(path) - 1] == '/'){//if its a folder                       
+                        dirpath = strcat(dirpath, path);                        
+                     }
+
+                     DIR *dir;
+                     struct dirent *entry;
+                     struct stat filestat;
+                     if ((dir = opendir(dirpath)) != NULL) {
+                         while ((entry = readdir(dir)) != NULL) {
+                           char *filename = entry->d_name;
+                         url_decode(filename);  // Decode URL-encoded filename
+                         
+                          if (strcmp(filename, ".") != 0 && strcmp(filename, "..") != 0) {
+                             char filepath[BUF_SIZE];
+                             snprintf(filepath, BUF_SIZE, "%s/%s", dirpath, filename);
+            
+                             if (stat(filepath, &filestat) == 0 && S_ISDIR(filestat.st_mode)) {
+                                 snprintf(response, BUF_SIZE, "<li><a href=\"%s/\">%s/</a></li>", filename, filename);
+                                } else {
+                                 snprintf(response, BUF_SIZE, "<li><a href=\"%s\">%s</a></li>", filename, filename);
+                                }
+                             if (send(fds.fd, response, strlen(response), 0) < 0) {
+                                 error("ERROR sending directory listing");
+                                 return -1;
+                                }
+                            }
+                        }
+                        closedir(dir);
+                        strcpy(dirpath,temp);
+                        } 
+                        else {
+                         error("ERROR opening directory");
+                         return -1;
+                         }
+               
+                    
+                     // Send HTML footer
+                     snprintf(response, BUF_SIZE, "</ul></body></html>");
+                     if (send(fds.fd, response, strlen(response), 0) < 0) {error("ERROR sending HTML footer");return -1;}  
+                     return 0;
+}
 
  int main(int argc, char *argv[]) {
     int sockfd, newsockfd, portno;
@@ -158,54 +212,9 @@ void url_decode(char *str)
                  // Handle GET requests
                 if (strcmp(method, "GET") == 0) {                   
                     if (strcmp(path, "/") == 0 || path[strlen(path) - 1] == '/') {
-                     // Send HTTP response header
-                     char response[BUF_SIZE];
-                     snprintf(response, BUF_SIZE, "HTTP/1.1 200 OK\r\n"
-                             "Content-Type: text/html\r\n"
-                             "Connection: close\r\n\r\n"
-                             "<html><body><ul>");
-                     if (send(fds[i].fd, response, strlen(response), 0) < 0) {
-                        error("ERROR sending HTTP response header");
-                     }
-
-                     // Send directory listing
-                     if(path[strlen(path) - 1] == '/'){//if its a folder                       
-                        dirpath = strcat(dirpath, path);                        
-                     }
-
-                     DIR *dir;
-                     struct dirent *entry;
-                     struct stat filestat;
-                     if ((dir = opendir(dirpath)) != NULL) {
-                         while ((entry = readdir(dir)) != NULL) {
-                           char *filename = entry->d_name;
-                         url_decode(filename);  // Decode URL-encoded filename
-                         
-                          if (strcmp(filename, ".") != 0 && strcmp(filename, "..") != 0) {
-                             char filepath[BUF_SIZE];
-                             snprintf(filepath, BUF_SIZE, "%s/%s", dirpath, filename);
-            
-                             if (stat(filepath, &filestat) == 0 && S_ISDIR(filestat.st_mode)) {
-                                 snprintf(response, BUF_SIZE, "<li><a href=\"%s/\">%s/</a></li>", filename, filename);
-                                } else {
-                                 snprintf(response, BUF_SIZE, "<li><a href=\"%s\">%s</a></li>", filename, filename);
-                                }
-                             if (send(fds[i].fd, response, strlen(response), 0) < 0) {
-                                 error("ERROR sending directory listing");
-                                }
-                            }
+                      if(send_directory(path,fds[i],dirpath,temp)<0){
+                        error("Error sending directory");
                         }
-                        closedir(dir);
-                        strcpy(dirpath,temp);
-                        } 
-                        else {
-                         error("ERROR opening directory");
-                         }
-               
-                    
-                     // Send HTML footer
-                     snprintf(response, BUF_SIZE, "</ul></body></html>");
-                     if (send(fds[i].fd, response, strlen(response), 0) < 0) {error("ERROR sending HTML footer");}    
                     } 
                     else if (strcmp(path, "/favicon.ico") == 0) {
                       // Ignore request for favicon.ico
