@@ -75,7 +75,7 @@ void url_decode(char *str)
     close(fd);
      return 0;
 }
-// Send directory contents to socket
+// Manage directory and file 
 int send_directory(char *path,struct pollfd fds,char *dirpath,char *temp){
      // Send HTTP response header
                      char response[BUF_SIZE];
@@ -104,11 +104,24 @@ int send_directory(char *path,struct pollfd fds,char *dirpath,char *temp){
                           if (strcmp(filename, ".") != 0 && strcmp(filename, "..") != 0) {
                              char filepath[BUF_SIZE];
                              snprintf(filepath, BUF_SIZE, "%s/%s", dirpath, filename);
-            
+                             struct stat filestat;
+                                if (stat(filepath, &filestat) < 0) {
+                                 continue;}
+                               char infoTime[BUF_SIZE];
+                                char infoSize[BUF_SIZE];
+                            struct tm *tm_info = localtime(&filestat.st_mtime);
+                            strftime(&infoTime[0], BUF_SIZE, "%Y-%m-%d %H:%M:%S", tm_info);
+                            snprintf(&infoSize[0], BUF_SIZE , " %ld bytes", filestat.st_size);
+
+                            char info[BUF_SIZE*2+11];
+                            sprintf(info,"Size:%s Date:%s",infoSize,infoTime);
+
+
+             
                              if (stat(filepath, &filestat) == 0 && S_ISDIR(filestat.st_mode)) {
-                                 snprintf(response, BUF_SIZE, "<li><a href=\"%s/\">%s/</a></li>", filename, filename);
+                                 snprintf(response, BUF_SIZE*2+37,"<li><a href=\"%s/\">%s/</a></li>%s", filename, filename,info);
                                 } else {
-                                 snprintf(response, BUF_SIZE, "<li><a href=\"%s\">%s</a></li>", filename, filename);
+                                 snprintf(response,BUF_SIZE*2+37, "<li><a href=\"%s\">%s</a></li>%s", filename, filename,info);
                                 }
                              if (send(fds.fd, response, strlen(response), 0) < 0) {
                                  error("ERROR sending directory listing");
