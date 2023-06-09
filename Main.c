@@ -210,6 +210,14 @@ int send_directory(char *path,struct pollfd fds,char *dirpath,char *temp){
         if (fds[0].revents & POLLIN) {
             clilen = sizeof(cli_addr);
             newsockfd = accept(sockfd, (struct sockaddr *)&cli_addr, &clilen);
+
+
+            pid_t pid = fork();
+if (pid > 0) {
+    close(newsockfd);
+    continue;
+} 
+
             if (newsockfd < 0) {
                 error("ERROR on accept");
             }
@@ -275,5 +283,7 @@ int send_directory(char *path,struct pollfd fds,char *dirpath,char *temp){
         }
     }
     close(sockfd);
+    close(newsockfd);
+    exit(0);
     return 0;
 }
