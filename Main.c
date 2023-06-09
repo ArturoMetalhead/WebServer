@@ -159,7 +159,24 @@ int send_directory(char *path,struct pollfd fds,char *dirpath,char *temp){
      // Bind socket to port
     memset(&serv_addr, 0, sizeof(serv_addr));
     portno =atoi(argv[1]);
-    char *dirpath = argv[2];
+   
+    int total=0;
+    for (size_t i = 2; i < argc; i++)
+    {
+        total+=strlen(argv[i]);
+    }
+    char *dirpath = (char*) malloc(total + argc - 2);
+
+    for (size_t i = 2; i < argc; i++)
+    {
+        strcat(dirpath,argv[i]);
+        if(i!=argc-1){
+        strcat(dirpath," ");}
+    }
+    //imprimir dirpath
+    printf("%s\n",dirpath);
+    
+
     char *temp=(char*) malloc(strlen(dirpath) + 1);
     strcpy(temp,dirpath);
     strcpy(temp,dirpath);
